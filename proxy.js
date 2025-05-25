@@ -17,7 +17,7 @@ app.post('/proxy/login', async (req, res) => {
   console.log('요청 내용:', req.body);
 
   try {
-    const apiRes = await fetch('https://webcraft-api.onrender.com/login', {
+    const apiRes = await fetch('https://wc-piwm.onrender.com/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(req.body)
@@ -46,7 +46,7 @@ app.post('/proxy/signUp', async (req, res) => {
   console.log('요청 내용:', req.body);
 
   try {
-    const apiRes = await fetch('https://webcraft-api.onrender.com/signUp', {
+    const apiRes = await fetch('https://wc-piwm.onrender.com/signUp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(req.body)
@@ -92,7 +92,7 @@ app.post('/proxy/map/save', (req, res) => {
 
   bb.on('close', async () => {
     try {
-      const apiRes = await fetch('https://webcraft-api.onrender.com/map/save', {
+      const apiRes = await fetch('https://wc-piwm.onrender.com/map/save', {
         method: 'POST',
         headers: formData.getHeaders(),
         body: formData
@@ -120,4 +120,3 @@ app.post('/proxy/map/save', (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`프록시 서버 실행 중 on port ${PORT}`));
-
