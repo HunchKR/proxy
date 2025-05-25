@@ -25,10 +25,11 @@ app.post('/proxy/login', async (req, res) => {
       body: JSON.stringify(req.body)
     });
 
-    // 쿠키 전달 (Set-Cookie → 클라이언트)
+    // ✅ Set-Cookie 헤더 전달 (배열로 강제 변환)
     const setCookie = apiRes.headers.raw()['set-cookie'];
     if (setCookie) {
-      res.setHeader('Set-Cookie', setCookie); // 대소문자 주의!
+      console.log('백엔드에서 받은 Set-Cookie:', setCookie);
+      res.setHeader('Set-Cookie', Array.isArray(setCookie) ? setCookie : [setCookie]);
     }
 
     const text = await apiRes.text();
@@ -48,6 +49,7 @@ app.post('/proxy/login', async (req, res) => {
 app.post('/proxy/signUp', async (req, res) => {
   console.log('--- 회원가입 요청 수신 ---');
   console.log('요청 내용:', req.body);
+  console.log('요청 쿠키:', req.headers.cookie);
 
   try {
     const apiRes = await fetch('https://wc-piwm.onrender.com/signUp', {
@@ -75,6 +77,8 @@ app.post('/proxy/signUp', async (req, res) => {
 // 맵 저장 프록시
 app.post('/proxy/map/save', (req, res) => {
   console.log('--- 맵 저장 요청 수신 ---');
+  console.log('요청 쿠키:', req.headers.cookie);
+
   const bb = busboy({ headers: req.headers });
   const formData = new FormData();
 
@@ -128,6 +132,7 @@ app.post('/proxy/map/save', (req, res) => {
 app.post('/proxy/map/search', async (req, res) => {
   console.log('--- 맵 검색 요청 수신 ---');
   console.log('요청 내용:', req.body);
+  console.log('요청 쿠키:', req.headers.cookie);
 
   try {
     const apiRes = await fetch('https://wc-piwm.onrender.com/map/search', {
