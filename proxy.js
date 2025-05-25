@@ -164,3 +164,9 @@ app.post('/proxy/map/search', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`프록시 서버 실행 중 on port ${PORT}`));
+
+
+app.get('/proxy/ping', (req, res) => {
+  res.status(200).send('pong');
+});
+
