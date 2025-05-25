@@ -69,7 +69,7 @@ app.post('/proxy/signUp', async (req, res) => {
   }
 });
 
-// 맵 저장 프록시
+//맵저장
 app.post('/proxy/map/save', (req, res) => {
   console.log('--- 맵 저장 요청 수신 ---');
   const bb = busboy({ headers: req.headers });
@@ -95,12 +95,17 @@ app.post('/proxy/map/save', (req, res) => {
       const apiRes = await fetch('https://wc-piwm.onrender.com/map/save', {
         method: 'POST',
         headers: formData.getHeaders(),
-        body: formData
+        body: formData,
+        credentials: 'include'
       });
 
       const text = await apiRes.text();
       console.log('백엔드 응답 상태:', apiRes.status);
       console.log('백엔드 응답 본문:', text);
+
+      if (apiRes.status === 401 || apiRes.status === 403) {
+        return res.status(apiRes.status).json({ message: '로그인이 필요합니다.' });
+      }
 
       if (!apiRes.ok) {
         return res.status(apiRes.status).json({ message: '맵 저장 실패', detail: text });
@@ -129,13 +134,17 @@ app.post('/proxy/map/search', async (req, res) => {
       headers: {
         'Content-Type': 'application/json'
       },
-      credentials: 'include',
-      body: JSON.stringify(req.body)
+      body: JSON.stringify(req.body),
+      credentials: 'include'
     });
 
     const text = await apiRes.text();
     console.log('백엔드 응답 상태:', apiRes.status);
     console.log('백엔드 응답 본문:', text);
+
+    if (apiRes.status === 401 || apiRes.status === 403) {
+      return res.status(apiRes.status).json({ message: '로그인이 필요합니다.' });
+    }
 
     const contentType = apiRes.headers.get('content-type');
     const data = contentType?.includes('application/json') ? JSON.parse(text) : { message: text };
