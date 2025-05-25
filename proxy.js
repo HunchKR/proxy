@@ -6,7 +6,7 @@ const FormData = require('form-data');
 const app = express();
 
 app.use(cors({
-  origin: 'http://undertale.dothome.co.kr',
+  origin: 'http://webcraftpc.com/',
   credentials: true
 }));
 app.use(express.json());
