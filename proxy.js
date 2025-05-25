@@ -25,10 +25,10 @@ app.post('/proxy/login', async (req, res) => {
       body: JSON.stringify(req.body)
     });
 
-    // 쿠키 전달
+    // 쿠키 전달 (Set-Cookie → 클라이언트)
     const setCookie = apiRes.headers.raw()['set-cookie'];
     if (setCookie) {
-      res.setHeader('set-cookie', setCookie);
+      res.setHeader('Set-Cookie', setCookie); // 대소문자 주의!
     }
 
     const text = await apiRes.text();
