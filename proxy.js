@@ -7,7 +7,7 @@ const app = express();
 
 
 app.use(cors({
-  origin: 'http://webcraftpc.com', 
+  origin: 'https://webcraftpc.com', 
   credentials: true
 }));
 app.use(express.json());
