@@ -20,26 +20,23 @@ app.post('/proxy/login', async (req, res) => {
     const apiRes = await fetch('https://wc-piwm.onrender.com/login', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'cookie': req.headers.cookie || ''
+        'Content-Type': 'application/json'
       },
-      body: JSON.stringify(req.body),
-      credentials: 'include'
+      body: JSON.stringify(req.body)
     });
+
+    // 쿠키 전달
+    const setCookie = apiRes.headers.raw()['set-cookie'];
+    if (setCookie) {
+      res.setHeader('set-cookie', setCookie);
+    }
 
     const text = await apiRes.text();
     console.log('백엔드 응답 상태:', apiRes.status);
     console.log('백엔드 응답 본문:', text);
 
-    // 쿠키 전달
-    const setCookie = apiRes.headers.raw()['set-cookie'];
-    if (setCookie) {
-      res.setHeader('Set-Cookie', setCookie);
-    }
-
     const contentType = apiRes.headers.get('content-type');
     const data = contentType?.includes('application/json') ? JSON.parse(text) : { message: text };
-
     res.status(apiRes.status).json(data);
   } catch (err) {
     console.error('로그인 프록시 오류:', err);
@@ -59,8 +56,7 @@ app.post('/proxy/signUp', async (req, res) => {
         'Content-Type': 'application/json',
         'cookie': req.headers.cookie || ''
       },
-      body: JSON.stringify(req.body),
-      credentials: 'include'
+      body: JSON.stringify(req.body)
     });
 
     const text = await apiRes.text();
@@ -69,7 +65,6 @@ app.post('/proxy/signUp', async (req, res) => {
 
     const contentType = apiRes.headers.get('content-type');
     const data = contentType?.includes('application/json') ? JSON.parse(text) : { message: text };
-
     res.status(apiRes.status).json(data);
   } catch (err) {
     console.error('회원가입 프록시 오류:', err);
@@ -106,8 +101,7 @@ app.post('/proxy/map/save', (req, res) => {
           ...formData.getHeaders(),
           'cookie': req.headers.cookie || ''
         },
-        body: formData,
-        credentials: 'include'
+        body: formData
       });
 
       const text = await apiRes.text();
@@ -120,7 +114,6 @@ app.post('/proxy/map/save', (req, res) => {
 
       const contentType = apiRes.headers.get('content-type');
       const data = contentType?.includes('application/json') ? JSON.parse(text) : { message: text };
-
       res.status(apiRes.status).json(data);
     } catch (err) {
       console.error('맵 저장 프록시 오류:', err);
@@ -143,8 +136,7 @@ app.post('/proxy/map/search', async (req, res) => {
         'Content-Type': 'application/json',
         'cookie': req.headers.cookie || ''
       },
-      body: JSON.stringify(req.body),
-      credentials: 'include'
+      body: JSON.stringify(req.body)
     });
 
     const text = await apiRes.text();
@@ -157,7 +149,6 @@ app.post('/proxy/map/search', async (req, res) => {
 
     const contentType = apiRes.headers.get('content-type');
     const data = contentType?.includes('application/json') ? JSON.parse(text) : { message: text };
-
     res.status(apiRes.status).json(data);
   } catch (err) {
     console.error('맵 검색 프록시 오류:', err);
