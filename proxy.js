@@ -10,6 +10,10 @@ app.use(cors({
 app.use(express.json());
 
 app.post('/proxy/login', async (req, res) => {
+  console.log('프론트 로그인 요청 수신');
+  console.log('userId:', req.body.userId);
+  console.log('userPw:', req.body.userPw);
+
   try {
     const apiRes = await fetch('https://wc-piwm.onrender.com/login', {
       method: 'POST',
@@ -17,8 +21,12 @@ app.post('/proxy/login', async (req, res) => {
       body: JSON.stringify(req.body)
     });
 
-    const text = await apiRes.text(); // 200이 아닌 경우에도 처리 가능하게
+    const text = await apiRes.text();
     const contentType = apiRes.headers.get('content-type');
+
+    console.log('백엔드 응답 상태코드:', apiRes.status);
+    console.log('백엔드 응답 헤더:', apiRes.headers.raw());
+    console.log('백엔드 응답 내용:', text);
 
     if (!apiRes.ok) {
       return res.status(apiRes.status).json({
@@ -27,11 +35,10 @@ app.post('/proxy/login', async (req, res) => {
       });
     }
 
-    // JSON 형식이면 파싱, 아니면 문자열로 처리
     const data = contentType?.includes('application/json') ? JSON.parse(text) : { message: text };
     res.status(apiRes.status).json(data);
   } catch (err) {
-    console.error('❌ 프록시 오류:', err);
+    console.error('프록시 오류:', err);
     res.status(500).json({ message: '프록시 서버 오류', error: err.message });
   }
 });
