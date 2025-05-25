@@ -118,5 +118,33 @@ app.post('/proxy/map/save', (req, res) => {
   req.pipe(bb);
 });
 
+// 맵 검색 프록시
+app.post('/proxy/map/search', async (req, res) => {
+  console.log('--- 맵 검색 요청 수신 ---');
+  console.log('요청 내용:', req.body);
+
+  try {
+    const apiRes = await fetch('https://wc-piwm.onrender.com/map/search', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      credentials: 'include',
+      body: JSON.stringify(req.body)
+    });
+
+    const text = await apiRes.text();
+    console.log('백엔드 응답 상태:', apiRes.status);
+    console.log('백엔드 응답 본문:', text);
+
+    const contentType = apiRes.headers.get('content-type');
+    const data = contentType?.includes('application/json') ? JSON.parse(text) : { message: text };
+    res.status(apiRes.status).json(data);
+  } catch (err) {
+    console.error('맵 검색 프록시 오류:', err);
+    res.status(500).json({ message: '프록시 서버 오류', error: err.message });
+  }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`프록시 서버 실행 중 on port ${PORT}`));
