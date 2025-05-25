@@ -19,20 +19,27 @@ app.post('/proxy/login', async (req, res) => {
   try {
     const apiRes = await fetch('https://wc-piwm.onrender.com/login', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(req.body)
+      headers: {
+        'Content-Type': 'application/json',
+        'cookie': req.headers.cookie || ''
+      },
+      body: JSON.stringify(req.body),
+      credentials: 'include'
     });
 
     const text = await apiRes.text();
     console.log('백엔드 응답 상태:', apiRes.status);
     console.log('백엔드 응답 본문:', text);
 
-    if (!apiRes.ok) {
-      return res.status(apiRes.status).json({ message: '로그인 실패', detail: text });
+    // 쿠키 전달
+    const setCookie = apiRes.headers.raw()['set-cookie'];
+    if (setCookie) {
+      res.setHeader('Set-Cookie', setCookie);
     }
 
     const contentType = apiRes.headers.get('content-type');
     const data = contentType?.includes('application/json') ? JSON.parse(text) : { message: text };
+
     res.status(apiRes.status).json(data);
   } catch (err) {
     console.error('로그인 프록시 오류:', err);
@@ -48,20 +55,21 @@ app.post('/proxy/signUp', async (req, res) => {
   try {
     const apiRes = await fetch('https://wc-piwm.onrender.com/signUp', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(req.body)
+      headers: {
+        'Content-Type': 'application/json',
+        'cookie': req.headers.cookie || ''
+      },
+      body: JSON.stringify(req.body),
+      credentials: 'include'
     });
 
     const text = await apiRes.text();
     console.log('백엔드 응답 상태:', apiRes.status);
     console.log('백엔드 응답 본문:', text);
 
-    if (!apiRes.ok) {
-      return res.status(apiRes.status).json({ message: '회원가입 실패', detail: text });
-    }
-
     const contentType = apiRes.headers.get('content-type');
     const data = contentType?.includes('application/json') ? JSON.parse(text) : { message: text };
+
     res.status(apiRes.status).json(data);
   } catch (err) {
     console.error('회원가입 프록시 오류:', err);
@@ -69,7 +77,7 @@ app.post('/proxy/signUp', async (req, res) => {
   }
 });
 
-//맵저장
+// 맵 저장 프록시
 app.post('/proxy/map/save', (req, res) => {
   console.log('--- 맵 저장 요청 수신 ---');
   const bb = busboy({ headers: req.headers });
@@ -94,7 +102,10 @@ app.post('/proxy/map/save', (req, res) => {
     try {
       const apiRes = await fetch('https://wc-piwm.onrender.com/map/save', {
         method: 'POST',
-        headers: formData.getHeaders(),
+        headers: {
+          ...formData.getHeaders(),
+          'cookie': req.headers.cookie || ''
+        },
         body: formData,
         credentials: 'include'
       });
@@ -107,12 +118,9 @@ app.post('/proxy/map/save', (req, res) => {
         return res.status(apiRes.status).json({ message: '로그인이 필요합니다.' });
       }
 
-      if (!apiRes.ok) {
-        return res.status(apiRes.status).json({ message: '맵 저장 실패', detail: text });
-      }
-
       const contentType = apiRes.headers.get('content-type');
       const data = contentType?.includes('application/json') ? JSON.parse(text) : { message: text };
+
       res.status(apiRes.status).json(data);
     } catch (err) {
       console.error('맵 저장 프록시 오류:', err);
@@ -132,7 +140,8 @@ app.post('/proxy/map/search', async (req, res) => {
     const apiRes = await fetch('https://wc-piwm.onrender.com/map/search', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'cookie': req.headers.cookie || ''
       },
       body: JSON.stringify(req.body),
       credentials: 'include'
@@ -148,6 +157,7 @@ app.post('/proxy/map/search', async (req, res) => {
 
     const contentType = apiRes.headers.get('content-type');
     const data = contentType?.includes('application/json') ? JSON.parse(text) : { message: text };
+
     res.status(apiRes.status).json(data);
   } catch (err) {
     console.error('맵 검색 프록시 오류:', err);
