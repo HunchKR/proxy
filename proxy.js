@@ -13,8 +13,10 @@ app.use(express.json());
 
 // 로그인 프록시
 app.post('/proxy/login', async (req, res) => {
-  console.log('--- 로그인 요청 수신 ---');
-  console.log('요청 내용:', req.body);
+  const debugLog = {
+    route: '/proxy/login',
+    requestBody: req.body
+  };
 
   try {
     const apiRes = await fetch('https://wc-piwm.onrender.com/login', {
@@ -27,29 +29,31 @@ app.post('/proxy/login', async (req, res) => {
 
     const setCookie = apiRes.headers.raw()['set-cookie'];
     if (setCookie) {
-      console.log('백엔드에서 받은 Set-Cookie:', setCookie);
       res.setHeader('Set-Cookie', Array.isArray(setCookie) ? setCookie : [setCookie]);
-      res.setHeader('Access-Control-Expose-Headers', 'Set-Cookie'); // ✅ 추가
+      res.setHeader('Access-Control-Expose-Headers', 'Set-Cookie');
     }
 
     const text = await apiRes.text();
-    console.log('백엔드 응답 상태:', apiRes.status);
-    console.log('백엔드 응답 본문:', text);
+    debugLog.status = apiRes.status;
+    debugLog.rawResponse = text;
 
     const contentType = apiRes.headers.get('content-type');
     const data = contentType?.includes('application/json') ? JSON.parse(text) : { message: text };
-    res.status(apiRes.status).json(data);
+
+    res.status(apiRes.status).json({ ...data, debugLog });
   } catch (err) {
-    console.error('로그인 프록시 오류:', err);
-    res.status(500).json({ message: '프록시 서버 오류', error: err.message });
+    debugLog.error = err.message;
+    res.status(500).json({ message: '프록시 서버 오류', error: err.message, debugLog });
   }
 });
 
 // 회원가입 프록시
 app.post('/proxy/signUp', async (req, res) => {
-  console.log('--- 회원가입 요청 수신 ---');
-  console.log('요청 내용:', req.body);
-  console.log('요청 쿠키:', req.headers.cookie);
+  const debugLog = {
+    route: '/proxy/signUp',
+    requestBody: req.body,
+    cookies: req.headers.cookie || null
+  };
 
   try {
     const apiRes = await fetch('https://wc-piwm.onrender.com/signUp', {
@@ -62,28 +66,33 @@ app.post('/proxy/signUp', async (req, res) => {
     });
 
     const text = await apiRes.text();
-    console.log('백엔드 응답 상태:', apiRes.status);
-    console.log('백엔드 응답 본문:', text);
+    debugLog.status = apiRes.status;
+    debugLog.rawResponse = text;
 
     const contentType = apiRes.headers.get('content-type');
     const data = contentType?.includes('application/json') ? JSON.parse(text) : { message: text };
-    res.status(apiRes.status).json(data);
+
+    res.status(apiRes.status).json({ ...data, debugLog });
   } catch (err) {
-    console.error('회원가입 프록시 오류:', err);
-    res.status(500).json({ message: '프록시 서버 오류', error: err.message });
+    debugLog.error = err.message;
+    res.status(500).json({ message: '프록시 서버 오류', error: err.message, debugLog });
   }
 });
 
 // 맵 저장 프록시
 app.post('/proxy/map/save', (req, res) => {
-  console.log('--- 맵 저장 요청 수신 ---');
-  console.log('요청 쿠키:', req.headers.cookie);
+  const debugLog = {
+    route: '/proxy/map/save',
+    cookies: req.headers.cookie || null,
+    fields: {},
+    files: []
+  };
 
   const bb = busboy({ headers: req.headers });
   const formData = new FormData();
 
   bb.on('file', (fieldname, file, info) => {
-    console.log(`파일 수신: ${info.filename} (${info.mimeType})`);
+    debugLog.files.push({ filename: info.filename, mimeType: info.mimeType });
     formData.append('file', file, {
       filename: info.filename,
       contentType: info.mimeType
@@ -91,8 +100,8 @@ app.post('/proxy/map/save', (req, res) => {
   });
 
   bb.on('field', (fieldname, val) => {
+    debugLog.fields[fieldname] = val;
     if (fieldname === 'dto') {
-      console.log('dto 필드 수신:', val);
       formData.append('dto', val, { contentType: 'application/json' });
     }
   });
@@ -109,19 +118,19 @@ app.post('/proxy/map/save', (req, res) => {
       });
 
       const text = await apiRes.text();
-      console.log('백엔드 응답 상태:', apiRes.status);
-      console.log('백엔드 응답 본문:', text);
+      debugLog.status = apiRes.status;
+      debugLog.rawResponse = text;
 
       if (apiRes.status === 401 || apiRes.status === 403) {
-        return res.status(apiRes.status).json({ message: '로그인이 필요합니다.' });
+        return res.status(apiRes.status).json({ message: '로그인이 필요합니다.', debugLog });
       }
 
       const contentType = apiRes.headers.get('content-type');
       const data = contentType?.includes('application/json') ? JSON.parse(text) : { message: text };
-      res.status(apiRes.status).json(data);
+      res.status(apiRes.status).json({ ...data, debugLog });
     } catch (err) {
-      console.error('맵 저장 프록시 오류:', err);
-      res.status(500).json({ message: '프록시 서버 오류', error: err.message });
+      debugLog.error = err.message;
+      res.status(500).json({ message: '프록시 서버 오류', error: err.message, debugLog });
     }
   });
 
@@ -130,9 +139,11 @@ app.post('/proxy/map/save', (req, res) => {
 
 // 맵 검색 프록시
 app.post('/proxy/map/search', async (req, res) => {
-  console.log('--- 맵 검색 요청 수신 ---');
-  console.log('요청 내용:', req.body);
-  console.log('요청 쿠키:', req.headers.cookie);
+  const debugLog = {
+    route: '/proxy/map/search',
+    requestBody: req.body,
+    cookies: req.headers.cookie || null
+  };
 
   try {
     const apiRes = await fetch('https://wc-piwm.onrender.com/map/search', {
@@ -145,19 +156,19 @@ app.post('/proxy/map/search', async (req, res) => {
     });
 
     const text = await apiRes.text();
-    console.log('백엔드 응답 상태:', apiRes.status);
-    console.log('백엔드 응답 본문:', text);
+    debugLog.status = apiRes.status;
+    debugLog.rawResponse = text;
 
     if (apiRes.status === 401 || apiRes.status === 403) {
-      return res.status(apiRes.status).json({ message: '로그인이 필요합니다.' });
+      return res.status(apiRes.status).json({ message: '로그인이 필요합니다.', debugLog });
     }
 
     const contentType = apiRes.headers.get('content-type');
     const data = contentType?.includes('application/json') ? JSON.parse(text) : { message: text };
-    res.status(apiRes.status).json(data);
+    res.status(apiRes.status).json({ ...data, debugLog });
   } catch (err) {
-    console.error('맵 검색 프록시 오류:', err);
-    res.status(500).json({ message: '프록시 서버 오류', error: err.message });
+    debugLog.error = err.message;
+    res.status(500).json({ message: '프록시 서버 오류', error: err.message, debugLog });
   }
 });
 
