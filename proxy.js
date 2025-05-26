@@ -5,9 +5,8 @@ const busboy = require('busboy');
 const FormData = require('form-data');
 const app = express();
 
-
 app.use(cors({
-  origin: 'https://webcraftpc.com', 
+  origin: 'https://webcraftpc.com',
   credentials: true
 }));
 app.use(express.json());
@@ -26,11 +25,11 @@ app.post('/proxy/login', async (req, res) => {
       body: JSON.stringify(req.body)
     });
 
-    // ✅ Set-Cookie 헤더 전달 (배열로 강제 변환)
     const setCookie = apiRes.headers.raw()['set-cookie'];
     if (setCookie) {
       console.log('백엔드에서 받은 Set-Cookie:', setCookie);
       res.setHeader('Set-Cookie', Array.isArray(setCookie) ? setCookie : [setCookie]);
+      res.setHeader('Access-Control-Expose-Headers', 'Set-Cookie'); // ✅ 추가
     }
 
     const text = await apiRes.text();
@@ -165,14 +164,11 @@ app.post('/proxy/map/search', async (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`프록시 서버 실행 중 on port ${PORT}`));
 
-
-
 // 루트 응답 추가
 app.get('/', (req, res) => {
   res.status(200).send('Proxy server is live');
 });
 
 app.head('/', (req, res) => {
-  res.sendStatus(200); // HEAD 요청에 대응
+  res.sendStatus(200);
 });
-
