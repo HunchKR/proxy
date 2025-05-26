@@ -40,9 +40,11 @@ app.post('/proxy/login', async (req, res) => {
     const contentType = apiRes.headers.get('content-type');
     const data = contentType?.includes('application/json') ? JSON.parse(text) : { message: text };
 
+    console.log('[디버그 로그]', debugLog);
     res.status(apiRes.status).json({ ...data, debugLog });
   } catch (err) {
     debugLog.error = err.message;
+    console.error('[프록시 오류 - 로그인]', debugLog);
     res.status(500).json({ message: '프록시 서버 오류', error: err.message, debugLog });
   }
 });
@@ -72,9 +74,11 @@ app.post('/proxy/signUp', async (req, res) => {
     const contentType = apiRes.headers.get('content-type');
     const data = contentType?.includes('application/json') ? JSON.parse(text) : { message: text };
 
+    console.log('[디버그 로그]', debugLog);
     res.status(apiRes.status).json({ ...data, debugLog });
   } catch (err) {
     debugLog.error = err.message;
+    console.error('[프록시 오류 - 회원가입]', debugLog);
     res.status(500).json({ message: '프록시 서버 오류', error: err.message, debugLog });
   }
 });
@@ -122,14 +126,18 @@ app.post('/proxy/map/save', (req, res) => {
       debugLog.rawResponse = text;
 
       if (apiRes.status === 401 || apiRes.status === 403) {
+        console.log('[디버그 로그]', debugLog);
         return res.status(apiRes.status).json({ message: '로그인이 필요합니다.', debugLog });
       }
 
       const contentType = apiRes.headers.get('content-type');
       const data = contentType?.includes('application/json') ? JSON.parse(text) : { message: text };
+
+      console.log('[디버그 로그]', debugLog);
       res.status(apiRes.status).json({ ...data, debugLog });
     } catch (err) {
       debugLog.error = err.message;
+      console.error('[프록시 오류 - 맵 저장]', debugLog);
       res.status(500).json({ message: '프록시 서버 오류', error: err.message, debugLog });
     }
   });
@@ -160,22 +168,27 @@ app.post('/proxy/map/search', async (req, res) => {
     debugLog.rawResponse = text;
 
     if (apiRes.status === 401 || apiRes.status === 403) {
+      console.log('[디버그 로그]', debugLog);
       return res.status(apiRes.status).json({ message: '로그인이 필요합니다.', debugLog });
     }
 
     const contentType = apiRes.headers.get('content-type');
     const data = contentType?.includes('application/json') ? JSON.parse(text) : { message: text };
+
+    console.log('[디버그 로그]', debugLog);
     res.status(apiRes.status).json({ ...data, debugLog });
   } catch (err) {
     debugLog.error = err.message;
+    console.error('[프록시 오류 - 맵 검색]', debugLog);
     res.status(500).json({ message: '프록시 서버 오류', error: err.message, debugLog });
   }
 });
 
+// 서버 시작
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`프록시 서버 실행 중 on port ${PORT}`));
 
-// 루트 응답 추가
+// 루트 응답
 app.get('/', (req, res) => {
   res.status(200).send('Proxy server is live');
 });
