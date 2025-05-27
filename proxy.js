@@ -208,14 +208,14 @@ app.all('/', (req, res) => {
 });
 
 
-app.get('/proxy/ping', async (req, res) => {
-  // CORS 헤더 수동 설정
-  res.setHeader('Access-Control-Allow-Origin', 'https://webcraftpc.com');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
 
+app.get('/proxy/ping', async (req, res) => {
   try {
     const backendRes = await fetch('https://wc-piwm.onrender.com/ping', { method: 'HEAD' });
     const backendOnline = backendRes.ok;
+
+    res.setHeader('Access-Control-Allow-Origin', 'https://webcraftpc.com');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
 
     res.status(200).json({
       proxy: 'online',
@@ -223,13 +223,16 @@ app.get('/proxy/ping', async (req, res) => {
     });
   } catch (err) {
     console.error('[프록시 /proxy/ping 오류]', err.message);
+
+    res.setHeader('Access-Control-Allow-Origin', 'https://webcraftpc.com');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+
     res.status(200).json({
       proxy: 'online',
       backend: 'offline'
     });
   }
 });
-
 
 
 // 2 마지막에 listen
