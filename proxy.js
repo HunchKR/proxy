@@ -202,22 +202,30 @@ app.post('/proxy/map/search', async (req, res) => {
   }
 });
 
-// 서버 시작
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(` 프록시 서버 실행 중 (포트: ${PORT})`));
-
-
-// 모든 메서드 대응 (GET, HEAD 등)
+// 1️ 라우트 먼저 정의
 app.all('/', (req, res) => {
   res.status(200).send('Proxy server is live');
 });
 
-const res = await fetch("https://proxy-nx9j.onrender.com/proxy/ping", {
-  method: "HEAD",
-  credentials: "include",
+app.head('/proxy/ping', async (req, res) => {
+  try {
+    const backendRes = await fetch('https://wc-piwm.onrender.com/ping', {
+      method: 'HEAD',
+      timeout: 5000,
+    });
+    if (backendRes.ok) {
+      res.sendStatus(200);
+    } else {
+      res.sendStatus(502);
+    }
+  } catch (err) {
+    console.error('[프록시 /ping 오류]', err.message);
+    res.sendStatus(502);
+  }
 });
-if (res.ok) {
-  console.log("서버 온라인");
-} else {
-  console.log("서버 문제 있음");
-}
+
+// 2 마지막에 listen
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(` 프록시 서버 실행 중 (포트: ${PORT})`);
+});
