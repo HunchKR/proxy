@@ -204,12 +204,11 @@ app.post('/proxy/map/search', async (req, res) => {
 
 // 서버 시작
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`✅ 프록시 서버 실행 중 (포트: ${PORT})`));
+app.listen(PORT, () => console.log(` 프록시 서버 실행 중 (포트: ${PORT})`));
 
-// 루트 응답
-app.get('/', (req, res) => {
+
+// 모든 메서드 대응 (GET, HEAD 등)
+app.all('/', (req, res) => {
   res.status(200).send('Proxy server is live');
 });
-app.head('/', (req, res) => {
-  res.sendStatus(200);
-});
+
