@@ -5,13 +5,11 @@ const busboy = require('busboy');
 const FormData = require('form-data');
 const app = express();
 
-// CORS 설정
 app.use(cors({
   origin: 'https://webcraftpc.com',
   credentials: true
 }));
 
-// OPTIONS 프리플라이트 대응
 app.options('/proxy/*', cors({
   origin: 'https://webcraftpc.com',
   credentials: true
@@ -21,40 +19,24 @@ app.use(express.json());
 
 // 로그인 프록시
 app.post('/proxy/login', async (req, res) => {
-  const debugLog = {
-    route: '/proxy/login',
-    requestBody: req.body
-  };
-
+  const debugLog = { route: '/proxy/login', requestBody: req.body };
   console.log('[프록시 요청 쿠키]', req.headers.cookie || '(없음)');
-
   try {
     const apiRes = await fetch('https://wc-piwm.onrender.com/login', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(req.body)
     });
-
     const setCookie = apiRes.headers.raw()['set-cookie'];
     if (setCookie) {
       console.log('[쿠키 디버그] 백엔드로부터 받은 Set-Cookie:', setCookie);
-      const cookieArray = Array.isArray(setCookie) ? setCookie : [setCookie];
-      cookieArray.forEach(cookie => res.append('Set-Cookie', cookie));
+      setCookie.forEach(cookie => res.append('Set-Cookie', cookie));
       res.setHeader('Access-Control-Expose-Headers', 'Set-Cookie');
-    } else {
-      console.warn('[쿠키 경고] 백엔드에서 Set-Cookie 헤더가 없음!');
     }
-
     const text = await apiRes.text();
+    const data = apiRes.headers.get('content-type')?.includes('application/json') ? JSON.parse(text) : { message: text };
     debugLog.status = apiRes.status;
     debugLog.rawResponse = text;
-
-    const contentType = apiRes.headers.get('content-type');
-    const data = contentType?.includes('application/json') ? JSON.parse(text) : { message: text };
-
-    console.log('[디버그 로그]', debugLog);
     res.status(apiRes.status).json({ ...data, debugLog });
   } catch (err) {
     debugLog.error = err.message;
@@ -65,12 +47,7 @@ app.post('/proxy/login', async (req, res) => {
 
 // 회원가입 프록시
 app.post('/proxy/signUp', async (req, res) => {
-  const debugLog = {
-    route: '/proxy/signUp',
-    requestBody: req.body,
-    cookies: req.headers.cookie || null
-  };
-
+  const debugLog = { route: '/proxy/signUp', requestBody: req.body, cookies: req.headers.cookie || null };
   try {
     const apiRes = await fetch('https://wc-piwm.onrender.com/signUp', {
       method: 'POST',
@@ -80,15 +57,10 @@ app.post('/proxy/signUp', async (req, res) => {
       },
       body: JSON.stringify(req.body)
     });
-
     const text = await apiRes.text();
+    const data = apiRes.headers.get('content-type')?.includes('application/json') ? JSON.parse(text) : { message: text };
     debugLog.status = apiRes.status;
     debugLog.rawResponse = text;
-
-    const contentType = apiRes.headers.get('content-type');
-    const data = contentType?.includes('application/json') ? JSON.parse(text) : { message: text };
-
-    console.log('[디버그 로그]', debugLog);
     res.status(apiRes.status).json({ ...data, debugLog });
   } catch (err) {
     debugLog.error = err.message;
@@ -97,33 +69,26 @@ app.post('/proxy/signUp', async (req, res) => {
   }
 });
 
-// 맵 저장 프록시
+// 맵 저장 프록시 (버퍼 기반)
 app.post('/proxy/map/save', (req, res) => {
-  const debugLog = {
-    route: '/proxy/map/save',
-    cookies: req.headers.cookie || null,
-    fields: {},
-    files: []
-  };
-
-  console.log('[프록시 요청 쿠키] /proxy/map/save:', req.headers.cookie || '(없음)');
-
+  const debugLog = { route: '/proxy/map/save', cookies: req.headers.cookie || null, fields: {}, files: [] };
   const bb = busboy({ headers: req.headers });
   const formData = new FormData();
 
   bb.on('file', (fieldname, file, info) => {
-    debugLog.files.push({ filename: info.filename, mimeType: info.mimeType });
-    formData.append('file', file, {
-      filename: info.filename,
-      contentType: info.mimeType
+    const buffers = [];
+    file.on('data', data => buffers.push(data));
+    file.on('end', () => {
+      const buffer = Buffer.concat(buffers);
+      formData.append('file', buffer, { filename: info.filename, contentType: info.mimeType });
+      debugLog.files.push({ filename: info.filename, mimeType: info.mimeType });
     });
   });
 
   bb.on('field', (fieldname, val) => {
+    formData.append(fieldname, val);
+    if (fieldname === 'dto') formData.append('dto', val, { contentType: 'application/json' });
     debugLog.fields[fieldname] = val;
-    if (fieldname === 'dto') {
-      formData.append('dto', val, { contentType: 'application/json' });
-    }
   });
 
   bb.on('close', async () => {
@@ -132,24 +97,14 @@ app.post('/proxy/map/save', (req, res) => {
         method: 'POST',
         headers: {
           ...formData.getHeaders(),
-          'cookie': req.headers.cookie || ''
+          cookie: req.headers.cookie || ''
         },
         body: formData
       });
-
       const text = await apiRes.text();
+      const data = apiRes.headers.get('content-type')?.includes('application/json') ? JSON.parse(text) : { message: text };
       debugLog.status = apiRes.status;
       debugLog.rawResponse = text;
-
-      if (apiRes.status === 401 || apiRes.status === 403) {
-        console.log('[디버그 로그]', debugLog);
-        return res.status(apiRes.status).json({ message: '로그인이 필요합니다.', debugLog });
-      }
-
-      const contentType = apiRes.headers.get('content-type');
-      const data = contentType?.includes('application/json') ? JSON.parse(text) : { message: text };
-
-      console.log('[디버그 로그]', debugLog);
       res.status(apiRes.status).json({ ...data, debugLog });
     } catch (err) {
       debugLog.error = err.message;
@@ -163,14 +118,7 @@ app.post('/proxy/map/save', (req, res) => {
 
 // 맵 검색 프록시
 app.post('/proxy/map/search', async (req, res) => {
-  const debugLog = {
-    route: '/proxy/map/search',
-    requestBody: req.body,
-    cookies: req.headers.cookie || null
-  };
-
-  console.log('[프록시 요청 쿠키] /proxy/map/search:', req.headers.cookie || '(없음)');
-
+  const debugLog = { route: '/proxy/map/search', requestBody: req.body, cookies: req.headers.cookie || null };
   try {
     const apiRes = await fetch('https://wc-piwm.onrender.com/map/search', {
       method: 'POST',
@@ -180,20 +128,10 @@ app.post('/proxy/map/search', async (req, res) => {
       },
       body: JSON.stringify(req.body)
     });
-
     const text = await apiRes.text();
+    const data = apiRes.headers.get('content-type')?.includes('application/json') ? JSON.parse(text) : { message: text };
     debugLog.status = apiRes.status;
     debugLog.rawResponse = text;
-
-    if (apiRes.status === 401 || apiRes.status === 403) {
-      console.log('[디버그 로그]', debugLog);
-      return res.status(apiRes.status).json({ message: '로그인이 필요합니다.', debugLog });
-    }
-
-    const contentType = apiRes.headers.get('content-type');
-    const data = contentType?.includes('application/json') ? JSON.parse(text) : { message: text };
-
-    console.log('[디버그 로그]', debugLog);
     res.status(apiRes.status).json({ ...data, debugLog });
   } catch (err) {
     debugLog.error = err.message;
@@ -202,14 +140,11 @@ app.post('/proxy/map/search', async (req, res) => {
   }
 });
 
-// 1️ 라우트 먼저 정의
 app.all('/', (req, res) => {
   res.status(200).send('Proxy server is live');
 });
 
-
-
-// 1. OPTIONS 핸들링
+// CORS 옵션 프리플라이트 핑
 app.options('/proxy/ping', (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', 'https://webcraftpc.com');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -218,31 +153,20 @@ app.options('/proxy/ping', (req, res) => {
   res.sendStatus(204);
 });
 
-// 2. 실제 ping 요청 처리
+// 핑 API
 app.get('/proxy/ping', (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', 'https://webcraftpc.com');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
-
   fetch('https://wc-piwm.onrender.com/ping', { method: 'HEAD', timeout: 5000 })
-    .then((backendRes) => {
-      const backendOnline = backendRes.ok;
-      res.status(200).json({
-        proxy: 'online',
-        backend: backendOnline ? 'online' : 'offline'
-      });
+    .then(response => {
+      res.status(200).json({ proxy: 'online', backend: response.ok ? 'online' : 'offline' });
     })
-    .catch((err) => {
-      console.error('[프록시 /proxy/ping 오류]', err.message);
-      res.status(200).json({
-        proxy: 'online',
-        backend: 'offline'
-      });
+    .catch(error => {
+      console.error('[프록시 /proxy/ping 오류]', error.message);
+      res.status(200).json({ proxy: 'online', backend: 'offline' });
     });
 });
 
-
-
-// 2 마지막에 listen
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(` 프록시 서버 실행 중 (포트: ${PORT})`);
