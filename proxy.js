@@ -208,6 +208,7 @@ app.all('/', (req, res) => {
 });
 
 
+
 app.get('/proxy/ping', async (req, res) => {
   try {
     const backendRes = await fetch('https://wc-piwm.onrender.com/ping', { method: 'HEAD' });
