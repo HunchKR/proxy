@@ -71,7 +71,13 @@ app.post('/proxy/signUp', async (req, res) => {
 
 
 app.post('/proxy/map/save', (req, res) => {
-  const debugLog = { route: '/proxy/map/save', cookies: req.headers.cookie || null, fields: {}, files: [] };
+  const debugLog = {
+    route: '/proxy/map/save',
+    cookies: req.headers.cookie || null,
+    fields: {},
+    files: []
+  };
+
   const bb = busboy({ headers: req.headers });
   const formData = new FormData();
 
@@ -83,7 +89,10 @@ app.post('/proxy/map/save', (req, res) => {
       file.on('data', data => buffers.push(data));
       file.on('end', () => {
         const buffer = Buffer.concat(buffers);
-        formData.append(fieldname, buffer, { filename: info.filename, contentType: info.mimeType });
+        formData.append(fieldname, buffer, {
+          filename: info.filename,
+          contentType: info.mimeType
+        });
         debugLog.files.push({ filename: info.filename, mimeType: info.mimeType });
         resolve();
       });
@@ -93,13 +102,20 @@ app.post('/proxy/map/save', (req, res) => {
   });
 
   bb.on('field', (fieldname, val) => {
-    formData.append(fieldname, val);  // dto는 JSON 문자열로 전달됨
+    if (fieldname === 'dto') {
+      // dto는 JSON 형식의 blob으로 추가 (application/json 명시)
+      formData.append('dto', new Blob([val], { type: 'application/json' }), {
+        filename: 'dto.json'
+      });
+    } else {
+      formData.append(fieldname, val);
+    }
     debugLog.fields[fieldname] = val;
   });
 
   bb.on('close', async () => {
     try {
-      await Promise.all(filePromises);  // 모든 파일 처리가 끝난 후 fetch 시작
+      await Promise.all(filePromises); // 모든 파일 처리 완료 후 요청 전송
 
       const apiRes = await fetch('https://wc-piwm.onrender.com/map/save', {
         method: 'POST',
@@ -111,15 +127,22 @@ app.post('/proxy/map/save', (req, res) => {
       });
 
       const text = await apiRes.text();
-      const data = apiRes.headers.get('content-type')?.includes('application/json') ? JSON.parse(text) : { message: text };
+      const isJson = apiRes.headers.get('content-type')?.includes('application/json');
+      const data = isJson ? JSON.parse(text) : { message: text };
+
       debugLog.status = apiRes.status;
       debugLog.rawResponse = text;
+
       res.status(apiRes.status).json({ ...data, debugLog });
 
     } catch (err) {
       debugLog.error = err.message;
       console.error('[프록시 오류 - 맵 저장]', debugLog);
-      res.status(500).json({ message: '프록시 서버 오류', error: err.message, debugLog });
+      res.status(500).json({
+        message: '프록시 서버 오류',
+        error: err.message,
+        debugLog
+      });
     }
   });
 
