@@ -212,3 +212,12 @@ app.all('/', (req, res) => {
   res.status(200).send('Proxy server is live');
 });
 
+const res = await fetch("https://proxy-nx9j.onrender.com/proxy/ping", {
+  method: "HEAD",
+  credentials: "include",
+});
+if (res.ok) {
+  console.log("서버 온라인");
+} else {
+  console.log("서버 문제 있음");
+}
