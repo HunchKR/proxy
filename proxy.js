@@ -5,10 +5,18 @@ const busboy = require('busboy');
 const FormData = require('form-data');
 const app = express();
 
+// CORS 설정
 app.use(cors({
   origin: 'https://webcraftpc.com',
   credentials: true
 }));
+
+// OPTIONS 프리플라이트 대응
+app.options('/proxy/*', cors({
+  origin: 'https://webcraftpc.com',
+  credentials: true
+}));
+
 app.use(express.json());
 
 // 로그인 프록시
@@ -17,6 +25,8 @@ app.post('/proxy/login', async (req, res) => {
     route: '/proxy/login',
     requestBody: req.body
   };
+
+  console.log('[프록시 요청 쿠키]', req.headers.cookie || '(없음)');
 
   try {
     const apiRes = await fetch('https://wc-piwm.onrender.com/login', {
@@ -29,8 +39,12 @@ app.post('/proxy/login', async (req, res) => {
 
     const setCookie = apiRes.headers.raw()['set-cookie'];
     if (setCookie) {
-      res.setHeader('Set-Cookie', Array.isArray(setCookie) ? setCookie : [setCookie]);
+      console.log('[쿠키 디버그] 백엔드로부터 받은 Set-Cookie:', setCookie);
+      const cookieArray = Array.isArray(setCookie) ? setCookie : [setCookie];
+      cookieArray.forEach(cookie => res.append('Set-Cookie', cookie));
       res.setHeader('Access-Control-Expose-Headers', 'Set-Cookie');
+    } else {
+      console.warn('[쿠키 경고] 백엔드에서 Set-Cookie 헤더가 없음!');
     }
 
     const text = await apiRes.text();
@@ -91,6 +105,8 @@ app.post('/proxy/map/save', (req, res) => {
     fields: {},
     files: []
   };
+
+  console.log('[프록시 요청 쿠키] /proxy/map/save:', req.headers.cookie || '(없음)');
 
   const bb = busboy({ headers: req.headers });
   const formData = new FormData();
@@ -153,6 +169,8 @@ app.post('/proxy/map/search', async (req, res) => {
     cookies: req.headers.cookie || null
   };
 
+  console.log('[프록시 요청 쿠키] /proxy/map/search:', req.headers.cookie || '(없음)');
+
   try {
     const apiRes = await fetch('https://wc-piwm.onrender.com/map/search', {
       method: 'POST',
@@ -186,13 +204,12 @@ app.post('/proxy/map/search', async (req, res) => {
 
 // 서버 시작
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`프록시 서버 실행 중 on port ${PORT}`));
+app.listen(PORT, () => console.log(`✅ 프록시 서버 실행 중 (포트: ${PORT})`));
 
 // 루트 응답
 app.get('/', (req, res) => {
   res.status(200).send('Proxy server is live');
 });
-
 app.head('/', (req, res) => {
   res.sendStatus(200);
 });
