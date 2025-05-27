@@ -209,31 +209,37 @@ app.all('/', (req, res) => {
 
 
 
-app.get('/proxy/ping', async (req, res) => {
+// 1. OPTIONS 핸들링
+app.options('/proxy/ping', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', 'https://webcraftpc.com');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.sendStatus(204);
+});
+
+// 2. 실제 ping 요청 처리
+app.get('/proxy/ping', (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', 'https://webcraftpc.com');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
 
-  try {
-    const backendRes = await fetch('https://wc-piwm.onrender.com/ping', {
-      method: 'HEAD',
-      timeout: 5000, // 타임아웃 명시적으로 지정
+  fetch('https://wc-piwm.onrender.com/ping', { method: 'HEAD', timeout: 5000 })
+    .then((backendRes) => {
+      const backendOnline = backendRes.ok;
+      res.status(200).json({
+        proxy: 'online',
+        backend: backendOnline ? 'online' : 'offline'
+      });
+    })
+    .catch((err) => {
+      console.error('[프록시 /proxy/ping 오류]', err.message);
+      res.status(200).json({
+        proxy: 'online',
+        backend: 'offline'
+      });
     });
-
-    const backendOnline = backendRes.ok;
-
-    res.status(200).json({
-      proxy: 'online',
-      backend: backendOnline ? 'online' : 'offline',
-    });
-  } catch (err) {
-    console.error('[프록시 /proxy/ping 오류]', err.message);
-
-    res.status(200).json({
-      proxy: 'online',
-      backend: 'offline',
-    });
-  }
 });
+
 
 
 // 2 마지막에 listen
