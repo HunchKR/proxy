@@ -207,22 +207,25 @@ app.all('/', (req, res) => {
   res.status(200).send('Proxy server is live');
 });
 
-app.head('/proxy/ping', async (req, res) => {
+
+app.get('/proxy/ping', async (req, res) => {
   try {
-    const backendRes = await fetch('https://wc-piwm.onrender.com/ping', {
-      method: 'HEAD',
-      timeout: 5000,
+    const backendRes = await fetch('https://wc-piwm.onrender.com/ping', { method: 'HEAD' });
+    const backendOnline = backendRes.ok;
+
+    res.status(200).json({
+      proxy: 'online',
+      backend: backendOnline ? 'online' : 'offline'
     });
-    if (backendRes.ok) {
-      res.sendStatus(200);
-    } else {
-      res.sendStatus(502);
-    }
   } catch (err) {
-    console.error('[프록시 /ping 오류]', err.message);
-    res.sendStatus(502);
+    console.error('[프록시 /proxy/ping 오류]', err.message);
+    res.status(200).json({
+      proxy: 'online',
+      backend: 'offline'
+    });
   }
 });
+
 
 // 2 마지막에 listen
 const PORT = process.env.PORT || 3000;
