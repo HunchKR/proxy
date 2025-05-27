@@ -210,26 +210,27 @@ app.all('/', (req, res) => {
 
 
 app.get('/proxy/ping', async (req, res) => {
-  try {
-    const backendRes = await fetch('https://wc-piwm.onrender.com/ping', { method: 'HEAD' });
-    const backendOnline = backendRes.ok;
+  res.setHeader('Access-Control-Allow-Origin', 'https://webcraftpc.com');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
 
-    res.setHeader('Access-Control-Allow-Origin', 'https://webcraftpc.com');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  try {
+    const backendRes = await fetch('https://wc-piwm.onrender.com/ping', {
+      method: 'HEAD',
+      timeout: 5000, // 타임아웃 명시적으로 지정
+    });
+
+    const backendOnline = backendRes.ok;
 
     res.status(200).json({
       proxy: 'online',
-      backend: backendOnline ? 'online' : 'offline'
+      backend: backendOnline ? 'online' : 'offline',
     });
   } catch (err) {
     console.error('[프록시 /proxy/ping 오류]', err.message);
 
-    res.setHeader('Access-Control-Allow-Origin', 'https://webcraftpc.com');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-
     res.status(200).json({
       proxy: 'online',
-      backend: 'offline'
+      backend: 'offline',
     });
   }
 });
