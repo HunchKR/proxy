@@ -179,6 +179,78 @@ app.post('/proxy/map/search', async (req, res) => {
   }
 });
 
+//맵다운로드 
+app.post('/proxy/map/provide', async (req, res) => {
+  const debugLog = {
+    route: '/proxy/map/provide',
+    requestBody: req.body,
+    cookies: req.headers.cookie || null
+  };
+
+  try {
+    const apiRes = await fetch('https://wc-piwm.onrender.com/map/provide', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'cookie': req.headers.cookie || ''
+      },
+      body: JSON.stringify(req.body)
+    });
+
+    if (!apiRes.ok) {
+      const text = await apiRes.text();
+      return res.status(apiRes.status).json({ message: text, debugLog });
+    }
+
+    // 파일 다운로드 처리
+    res.setHeader('Content-Type', 'application/octet-stream');
+    const disposition = apiRes.headers.get('content-disposition');
+    if (disposition) {
+      res.setHeader('Content-Disposition', disposition);
+    }
+
+    apiRes.body.pipe(res);
+  } catch (err) {
+    debugLog.error = err.message;
+    console.error('[프록시 오류 - 맵 제공]', debugLog);
+    res.status(500).json({ message: '프록시 서버 오류', error: err.message, debugLog });
+  }
+});
+
+
+//맵제거
+app.post('/proxy/map/remove', async (req, res) => {
+  const debugLog = {
+    route: '/proxy/map/remove',
+    requestBody: req.body,
+    cookies: req.headers.cookie || null
+  };
+
+  try {
+    const apiRes = await fetch('https://wc-piwm.onrender.com/map/remove', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'cookie': req.headers.cookie || ''
+      },
+      body: JSON.stringify(req.body)
+    });
+
+    const text = await apiRes.text();
+    const data = apiRes.headers.get('content-type')?.includes('application/json') ? JSON.parse(text) : { message: text };
+
+    debugLog.status = apiRes.status;
+    debugLog.rawResponse = text;
+
+    res.status(apiRes.status).json({ ...data, debugLog });
+  } catch (err) {
+    debugLog.error = err.message;
+    console.error('[프록시 오류 - 맵 삭제]', debugLog);
+    res.status(500).json({ message: '프록시 서버 오류', error: err.message, debugLog });
+  }
+});
+
+
 // ping 확인용
 app.get('/proxy/ping', (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', 'https://webcraftpc.com');
