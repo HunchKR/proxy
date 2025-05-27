@@ -19,10 +19,21 @@ app.options('/proxy/*', cors({
 
 app.use(express.json());
 
-// 로그인 프록시
+// 공통 디버그 로깅 미들웨어
+app.use('/proxy', (req, res, next) => {
+  req.debugLog = {
+    route: req.originalUrl,
+    method: req.method,
+    cookies: req.headers.cookie || null,
+    requestBody: req.body || null,
+    timestamp: new Date().toISOString()
+  };
+  console.log(`[프록시 요청] ${req.method} ${req.originalUrl}`, req.debugLog);
+  next();
+});
+
+// 로그인
 app.post('/proxy/login', async (req, res) => {
-  const debugLog = { route: '/proxy/login', requestBody: req.body };
-  console.log('[프록시 요청 쿠키]', req.headers.cookie || '(없음)');
   try {
     const apiRes = await fetch('https://wc-piwm.onrender.com/login', {
       method: 'POST',
@@ -31,102 +42,80 @@ app.post('/proxy/login', async (req, res) => {
     });
     const setCookie = apiRes.headers.raw()['set-cookie'];
     if (setCookie) {
-      console.log('[쿠키 디버그] 백엔드로부터 받은 Set-Cookie:', setCookie);
       setCookie.forEach(cookie => res.append('Set-Cookie', cookie));
       res.setHeader('Access-Control-Expose-Headers', 'Set-Cookie');
     }
     const text = await apiRes.text();
-    const data = apiRes.headers.get('content-type')?.includes('application/json') ? JSON.parse(text) : { message: text };
-    debugLog.status = apiRes.status;
-    debugLog.rawResponse = text;
-    res.status(apiRes.status).json({ ...data, debugLog });
+    const isJson = apiRes.headers.get('content-type')?.includes('application/json');
+    const data = isJson ? JSON.parse(text) : { message: text };
+    req.debugLog.status = apiRes.status;
+    req.debugLog.rawResponse = text;
+    res.status(apiRes.status).json({ ...data, debugLog: req.debugLog });
   } catch (err) {
-    debugLog.error = err.message;
-    console.error('[프록시 오류 - 로그인]', debugLog);
-    res.status(500).json({ message: '프록시 서버 오류', error: err.message, debugLog });
+    req.debugLog.error = err.message;
+    console.error('[프록시 오류 - 로그인]', req.debugLog);
+    res.status(500).json({ message: '프록시 서버 오류', error: err.message, debugLog: req.debugLog });
   }
 });
 
-// 회원가입 프록시
+// 회원가입
 app.post('/proxy/signUp', async (req, res) => {
-  const debugLog = { route: '/proxy/signUp', requestBody: req.body, cookies: req.headers.cookie || null };
   try {
     const apiRes = await fetch('https://wc-piwm.onrender.com/signUp', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'cookie': req.headers.cookie || ''
+        cookie: req.headers.cookie || ''
       },
       body: JSON.stringify(req.body)
     });
     const text = await apiRes.text();
-    const data = apiRes.headers.get('content-type')?.includes('application/json') ? JSON.parse(text) : { message: text };
-    debugLog.status = apiRes.status;
-    debugLog.rawResponse = text;
-    res.status(apiRes.status).json({ ...data, debugLog });
+    const isJson = apiRes.headers.get('content-type')?.includes('application/json');
+    const data = isJson ? JSON.parse(text) : { message: text };
+    req.debugLog.status = apiRes.status;
+    req.debugLog.rawResponse = text;
+    res.status(apiRes.status).json({ ...data, debugLog: req.debugLog });
   } catch (err) {
-    debugLog.error = err.message;
-    console.error('[프록시 오류 - 회원가입]', debugLog);
-    res.status(500).json({ message: '프록시 서버 오류', error: err.message, debugLog });
+    req.debugLog.error = err.message;
+    console.error('[프록시 오류 - 회원가입]', req.debugLog);
+    res.status(500).json({ message: '프록시 서버 오류', error: err.message, debugLog: req.debugLog });
   }
 });
 
-// 맵 저장 프록시
+// 맵 저장
 app.post('/proxy/map/save', (req, res) => {
-  const debugLog = {
-    route: '/proxy/map/save',
-    cookies: req.headers.cookie || null,
-    fields: {},
-    files: []
-  };
-
+  const debugLog = req.debugLog;
   const bb = busboy({ headers: req.headers });
   const formData = new FormData();
   const filePromises = [];
 
-  req.on('error', (err) => {
-    debugLog.error = '요청 스트림 에러: ' + err.message;
-    console.error('[프록시 오류 - 요청 스트림]', debugLog);
-    res.status(500).json({ message: '요청 스트림 에러', error: err.message, debugLog });
-  });
-
-  bb.on('error', (err) => {
-    debugLog.error = '버스보이 에러: ' + err.message;
-    console.error('[프록시 오류 - busboy]', debugLog);
-    res.status(500).json({ message: 'busboy 오류', error: err.message, debugLog });
-  });
-
   bb.on('file', (fieldname, file, info) => {
     const buffers = [];
-    const filePromise = new Promise((resolve, reject) => {
+    const promise = new Promise((resolve, reject) => {
       file.on('data', data => buffers.push(data));
       file.on('end', () => {
-        const buffer = Buffer.concat(buffers);
-        formData.append(fieldname, buffer, {
+        formData.append(fieldname, Buffer.concat(buffers), {
           filename: info.filename,
           contentType: info.mimeType
         });
-        debugLog.files.push({ filename: info.filename, mimeType: info.mimeType });
+        debugLog.files = debugLog.files || [];
+        debugLog.files.push({ fieldname, filename: info.filename, mimeType: info.mimeType });
         resolve();
       });
       file.on('error', reject);
     });
-    filePromises.push(filePromise);
+    filePromises.push(promise);
   });
 
-  bb.on('field', (fieldname, val) => {
-    if (fieldname === 'dto') {
-      formData.append('dto', val, { contentType: 'application/json' });
-    } else {
-      formData.append(fieldname, val);
-    }
-    debugLog.fields[fieldname] = val;
+  bb.on('field', (fieldname, value) => {
+    formData.append(fieldname, value);
+    debugLog.fields = debugLog.fields || {};
+    debugLog.fields[fieldname] = value;
   });
 
   bb.on('close', async () => {
     try {
       await Promise.all(filePromises);
-
       const apiRes = await fetch('https://wc-piwm.onrender.com/map/save', {
         method: 'POST',
         headers: {
@@ -144,10 +133,8 @@ app.post('/proxy/map/save', (req, res) => {
       debugLog.rawResponse = text;
 
       res.status(apiRes.status).json({ ...data, debugLog });
-
     } catch (err) {
       debugLog.error = err.message;
-      console.error('[프록시 오류 - 맵 저장]', debugLog);
       res.status(500).json({ message: '프록시 서버 오류', error: err.message, debugLog });
     }
   });
@@ -155,122 +142,94 @@ app.post('/proxy/map/save', (req, res) => {
   req.pipe(bb);
 });
 
-// 맵 검색 프록시
+// 맵 검색
 app.post('/proxy/map/search', async (req, res) => {
-  const debugLog = { route: '/proxy/map/search', requestBody: req.body, cookies: req.headers.cookie || null };
   try {
     const apiRes = await fetch('https://wc-piwm.onrender.com/map/search', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'cookie': req.headers.cookie || ''
+        cookie: req.headers.cookie || ''
       },
       body: JSON.stringify(req.body)
     });
     const text = await apiRes.text();
-    const data = apiRes.headers.get('content-type')?.includes('application/json') ? JSON.parse(text) : { message: text };
-    debugLog.status = apiRes.status;
-    debugLog.rawResponse = text;
-    res.status(apiRes.status).json({ ...data, debugLog });
+    const isJson = apiRes.headers.get('content-type')?.includes('application/json');
+    const data = isJson ? JSON.parse(text) : { message: text };
+    req.debugLog.status = apiRes.status;
+    req.debugLog.rawResponse = text;
+    res.status(apiRes.status).json({ ...data, debugLog: req.debugLog });
   } catch (err) {
-    debugLog.error = err.message;
-    console.error('[프록시 오류 - 맵 검색]', debugLog);
-    res.status(500).json({ message: '프록시 서버 오류', error: err.message, debugLog });
+    req.debugLog.error = err.message;
+    res.status(500).json({ message: '프록시 서버 오류', error: err.message, debugLog: req.debugLog });
   }
 });
 
-//맵다운로드 
+// 맵 제공
 app.post('/proxy/map/provide', async (req, res) => {
-  const debugLog = {
-    route: '/proxy/map/provide',
-    requestBody: req.body,
-    cookies: req.headers.cookie || null
-  };
-
   try {
     const apiRes = await fetch('https://wc-piwm.onrender.com/map/provide', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'cookie': req.headers.cookie || ''
+        cookie: req.headers.cookie || ''
       },
       body: JSON.stringify(req.body)
     });
 
     if (!apiRes.ok) {
       const text = await apiRes.text();
-      return res.status(apiRes.status).json({ message: text, debugLog });
+      return res.status(apiRes.status).json({ message: text, debugLog: req.debugLog });
     }
 
-    // 파일 다운로드 처리
     res.setHeader('Content-Type', 'application/octet-stream');
     const disposition = apiRes.headers.get('content-disposition');
-    if (disposition) {
-      res.setHeader('Content-Disposition', disposition);
-    }
+    if (disposition) res.setHeader('Content-Disposition', disposition);
 
     apiRes.body.pipe(res);
   } catch (err) {
-    debugLog.error = err.message;
-    console.error('[프록시 오류 - 맵 제공]', debugLog);
-    res.status(500).json({ message: '프록시 서버 오류', error: err.message, debugLog });
+    req.debugLog.error = err.message;
+    res.status(500).json({ message: '프록시 서버 오류', error: err.message, debugLog: req.debugLog });
   }
 });
 
-
-//맵제거
+// 맵 제거
 app.post('/proxy/map/remove', async (req, res) => {
-  const debugLog = {
-    route: '/proxy/map/remove',
-    requestBody: req.body,
-    cookies: req.headers.cookie || null
-  };
-
   try {
     const apiRes = await fetch('https://wc-piwm.onrender.com/map/remove', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'cookie': req.headers.cookie || ''
+        cookie: req.headers.cookie || ''
       },
       body: JSON.stringify(req.body)
     });
 
     const text = await apiRes.text();
-    const data = apiRes.headers.get('content-type')?.includes('application/json') ? JSON.parse(text) : { message: text };
-
-    debugLog.status = apiRes.status;
-    debugLog.rawResponse = text;
-
-    res.status(apiRes.status).json({ ...data, debugLog });
+    const isJson = apiRes.headers.get('content-type')?.includes('application/json');
+    const data = isJson ? JSON.parse(text) : { message: text };
+    req.debugLog.status = apiRes.status;
+    req.debugLog.rawResponse = text;
+    res.status(apiRes.status).json({ ...data, debugLog: req.debugLog });
   } catch (err) {
-    debugLog.error = err.message;
-    console.error('[프록시 오류 - 맵 삭제]', debugLog);
-    res.status(500).json({ message: '프록시 서버 오류', error: err.message, debugLog });
+    req.debugLog.error = err.message;
+    res.status(500).json({ message: '프록시 서버 오류', error: err.message, debugLog: req.debugLog });
   }
 });
 
-
-// ping 확인용
+// 핑
 app.get('/proxy/ping', (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', 'https://webcraftpc.com');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
   fetch('https://wc-piwm.onrender.com/ping', { method: 'HEAD', timeout: 5000 })
-    .then(response => {
-      res.status(200).json({ proxy: 'online', backend: response.ok ? 'online' : 'offline' });
-    })
-    .catch(error => {
-      console.error('[프록시 /proxy/ping 오류]', error.message);
+    .then(r => res.status(200).json({ proxy: 'online', backend: r.ok ? 'online' : 'offline' }))
+    .catch(err => {
+      console.error('[프록시 ping 오류]', err.message);
       res.status(200).json({ proxy: 'online', backend: 'offline' });
     });
 });
 
-app.all('/', (req, res) => {
-  res.status(200).send('Proxy server is live');
-});
+app.all('/', (req, res) => res.status(200).send('Proxy server is live'));
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(` 프록시 서버 실행 중 (포트: ${PORT})`);
+  console.log(`✅ 프록시 서버 실행 중 (포트: ${PORT})`);
 });
-
