@@ -208,8 +208,11 @@ app.all('/', (req, res) => {
 });
 
 
-
 app.get('/proxy/ping', async (req, res) => {
+  // CORS 헤더 수동 설정
+  res.setHeader('Access-Control-Allow-Origin', 'https://webcraftpc.com');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+
   try {
     const backendRes = await fetch('https://wc-piwm.onrender.com/ping', { method: 'HEAD' });
     const backendOnline = backendRes.ok;
@@ -226,6 +229,7 @@ app.get('/proxy/ping', async (req, res) => {
     });
   }
 });
+
 
 
 // 2 마지막에 listen
