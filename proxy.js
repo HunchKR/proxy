@@ -69,30 +69,38 @@ app.post('/proxy/signUp', async (req, res) => {
   }
 });
 
-// 맵 저장 프록시 (버퍼 기반)
+
 app.post('/proxy/map/save', (req, res) => {
   const debugLog = { route: '/proxy/map/save', cookies: req.headers.cookie || null, fields: {}, files: [] };
   const bb = busboy({ headers: req.headers });
   const formData = new FormData();
 
+  const filePromises = [];
+
   bb.on('file', (fieldname, file, info) => {
     const buffers = [];
-    file.on('data', data => buffers.push(data));
-    file.on('end', () => {
-      const buffer = Buffer.concat(buffers);
-      formData.append('file', buffer, { filename: info.filename, contentType: info.mimeType });
-      debugLog.files.push({ filename: info.filename, mimeType: info.mimeType });
+    const filePromise = new Promise((resolve, reject) => {
+      file.on('data', data => buffers.push(data));
+      file.on('end', () => {
+        const buffer = Buffer.concat(buffers);
+        formData.append(fieldname, buffer, { filename: info.filename, contentType: info.mimeType });
+        debugLog.files.push({ filename: info.filename, mimeType: info.mimeType });
+        resolve();
+      });
+      file.on('error', reject);
     });
+    filePromises.push(filePromise);
   });
 
   bb.on('field', (fieldname, val) => {
-    formData.append(fieldname, val);
-    if (fieldname === 'dto') formData.append('dto', val, { contentType: 'application/json' });
+    formData.append(fieldname, val);  // dto는 JSON 문자열로 전달됨
     debugLog.fields[fieldname] = val;
   });
 
   bb.on('close', async () => {
     try {
+      await Promise.all(filePromises);  // 모든 파일 처리가 끝난 후 fetch 시작
+
       const apiRes = await fetch('https://wc-piwm.onrender.com/map/save', {
         method: 'POST',
         headers: {
@@ -101,11 +109,13 @@ app.post('/proxy/map/save', (req, res) => {
         },
         body: formData
       });
+
       const text = await apiRes.text();
       const data = apiRes.headers.get('content-type')?.includes('application/json') ? JSON.parse(text) : { message: text };
       debugLog.status = apiRes.status;
       debugLog.rawResponse = text;
       res.status(apiRes.status).json({ ...data, debugLog });
+
     } catch (err) {
       debugLog.error = err.message;
       console.error('[프록시 오류 - 맵 저장]', debugLog);
