@@ -5,11 +5,13 @@ const busboy = require('busboy');
 const FormData = require('form-data');
 const app = express();
 
+// CORS 설정
 app.use(cors({
   origin: 'https://webcraftpc.com',
   credentials: true
 }));
 
+// OPTIONS 프리플라이트 대응
 app.options('/proxy/*', cors({
   origin: 'https://webcraftpc.com',
   credentials: true
@@ -69,7 +71,7 @@ app.post('/proxy/signUp', async (req, res) => {
   }
 });
 
-
+// 맵 저장 프록시
 app.post('/proxy/map/save', (req, res) => {
   const debugLog = {
     route: '/proxy/map/save',
@@ -80,8 +82,19 @@ app.post('/proxy/map/save', (req, res) => {
 
   const bb = busboy({ headers: req.headers });
   const formData = new FormData();
-
   const filePromises = [];
+
+  req.on('error', (err) => {
+    debugLog.error = '요청 스트림 에러: ' + err.message;
+    console.error('[프록시 오류 - 요청 스트림]', debugLog);
+    res.status(500).json({ message: '요청 스트림 에러', error: err.message, debugLog });
+  });
+
+  bb.on('error', (err) => {
+    debugLog.error = '버스보이 에러: ' + err.message;
+    console.error('[프록시 오류 - busboy]', debugLog);
+    res.status(500).json({ message: 'busboy 오류', error: err.message, debugLog });
+  });
 
   bb.on('file', (fieldname, file, info) => {
     const buffers = [];
@@ -103,10 +116,7 @@ app.post('/proxy/map/save', (req, res) => {
 
   bb.on('field', (fieldname, val) => {
     if (fieldname === 'dto') {
-      // dto는 JSON 형식의 blob으로 추가 (application/json 명시)
-      formData.append('dto', new Blob([val], { type: 'application/json' }), {
-        filename: 'dto.json'
-      });
+      formData.append('dto', val, { contentType: 'application/json' });
     } else {
       formData.append(fieldname, val);
     }
@@ -115,7 +125,7 @@ app.post('/proxy/map/save', (req, res) => {
 
   bb.on('close', async () => {
     try {
-      await Promise.all(filePromises); // 모든 파일 처리 완료 후 요청 전송
+      await Promise.all(filePromises);
 
       const apiRes = await fetch('https://wc-piwm.onrender.com/map/save', {
         method: 'POST',
@@ -138,11 +148,7 @@ app.post('/proxy/map/save', (req, res) => {
     } catch (err) {
       debugLog.error = err.message;
       console.error('[프록시 오류 - 맵 저장]', debugLog);
-      res.status(500).json({
-        message: '프록시 서버 오류',
-        error: err.message,
-        debugLog
-      });
+      res.status(500).json({ message: '프록시 서버 오류', error: err.message, debugLog });
     }
   });
 
@@ -173,20 +179,7 @@ app.post('/proxy/map/search', async (req, res) => {
   }
 });
 
-app.all('/', (req, res) => {
-  res.status(200).send('Proxy server is live');
-});
-
-// CORS 옵션 프리플라이트 핑
-app.options('/proxy/ping', (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', 'https://webcraftpc.com');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  res.sendStatus(204);
-});
-
-// 핑 API
+// ping 확인용
 app.get('/proxy/ping', (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', 'https://webcraftpc.com');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -200,7 +193,12 @@ app.get('/proxy/ping', (req, res) => {
     });
 });
 
+app.all('/', (req, res) => {
+  res.status(200).send('Proxy server is live');
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(` 프록시 서버 실행 중 (포트: ${PORT})`);
 });
+
